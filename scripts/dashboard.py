@@ -1,26 +1,16 @@
 # dashboard.py
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
+import pandas as pd
+import streamlit as st
 
-app = dash.Dash(__name__)
+# Load data
+df = pd.read_csv('data/financial_news.csv')
 
-app.layout = html.Div(children=[
-    html.H1(children='Dashboard'),
+# Dashboard
+st.title('Financial News Sentiment Dashboard')
 
-    dcc.Graph(
-        id='example-graph',
-        figure={
-            'data': [
-                {'x': [1, 2, 3], 'y': [4, 1, 2], 'type': 'bar', 'name': 'SF'},
-                {'x': [1, 2, 3], 'y': [2, 4, 5], 'type': 'bar', 'name': 'NYC'},
-            ],
-            'layout': {
-                'title': 'Dash Data Visualization'
-            }
-        }
-    )
-])
+# Display data
+st.write(df.head())
 
-if __name__ == '__main__':
-    app.run_server(debug=True)
+# Plot sentiment distribution
+st.subheader('Sentiment Distribution')
+st.bar_chart(df['sentiment'].value_counts())

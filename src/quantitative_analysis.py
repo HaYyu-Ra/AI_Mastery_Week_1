@@ -1,39 +1,49 @@
 import pandas as pd
-import talib as ta
+import talib
 import matplotlib.pyplot as plt
+from pynance import PyNance
+import os
 
-# Define file paths
-file_paths = {
-    'AAPL': 'data/AAPL_historical_data.csv',
-    'AMZN': 'data/AMZN_historical_data.csv',
-    'GOOG': 'data/GOOG_historical_data.csv',
-    'META': 'data/META_historical_data.csv',
-    'MSFT': 'data/MSFT_historical_data.csv',
-    'NVDA': 'data/NVDA_historical_data.csv',
-    'TSLA': 'data/TSLA_historical_data.csv'
+# File paths
+stock_data_paths = {
+    'AAPL': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AAPL_historical_data.csv',
+    'AMZN': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AMZN_historical_data.csv',
+    'GOOG': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\GOOG_historical_data.csv',
+    'META': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\META_historical_data.csv',
+    'MSFT': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\MSFT_historical_data.csv',
+    'NVDA': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\NVDA_historical_data.csv',
+    'TSLA': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\TSLA_historical_data.csv'
 }
+output_directory = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\outputs'
 
-# Load data into pandas DataFrame
-stock_data = {}
-for symbol, path in file_paths.items():
-    df = pd.read_csv(path, parse_dates=['Date'])
-    stock_data[symbol] = df
+def calculate_indicators(df):
+    df['SMA'] = talib.SMA(df['Close'], timeperiod=30)
+    df['RSI'] = talib.RSI(df['Close'], timeperiod=14)
+    df['MACD'], df['MACD Signal'], df['MACD Hist'] = talib.MACD(df['Close'])
+    return df
 
-# Display a sample of the loaded data
-print(stock_data['AAPL'].head())
-for symbol, df in stock_data.items():
-    df['SMA_50'] = ta.SMA(df['Close'], timeperiod=50)
-    df['RSI'] = ta.RSI(df['Close'], timeperiod=14)
-    df['MACD'], df['MACD_signal'], _ = ta.MACD(df['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
-
-# Save the updated data
-for symbol, df in stock_data.items():
-    df.to_csv(f'data/{symbol}_technical_indicators.csv', index=False)
-# Visualize technical indicators
-for symbol, df in stock_data.items():
-    plt.figure(figsize=(14,7))
-    plt.title(f'{symbol} - Moving Average, RSI, and MACD')
+def visualize_stock_data(df, symbol):
+    plt.figure(figsize=(14, 7))
     plt.plot(df['Date'], df['Close'], label='Close Price')
-    plt.plot(df['Date'], df['SMA_50'], label='50-Day SMA', color='orange')
+    plt.plot(df['Date'], df['SMA'], label='SMA', linestyle='--')
+    plt.title(f'{symbol} Stock Price and Indicators')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
     plt.legend()
-    plt.show()
+    plt.grid(True)
+    plt.savefig(os.path.join(output_directory, f'{symbol}_stock_analysis.png'))
+    plt.close()
+
+def main():
+    for symbol, file_path in stock_data_paths.items():
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+            df['Date'] = pd.to_datetime(df['Date'])
+            df = calculate_indicators(df)
+            visualize_stock_data(df, symbol)
+            print(f'Quantitative analysis and visualization for {symbol} completed.')
+        else:
+            print(f'Stock data file not found for {symbol} at {file_path}')
+
+if __name__ == "__main__":
+    main()

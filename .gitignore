@@ -1,0 +1,11 @@
+# Ignore all .csv files
+*.csv
+
+# Ignore large files by extension (for example, .zip or .tar)
+*.zip
+*.tar
+*.gz
+*.rar
+
+# You can also ignore specific large files by name if needed
+large_file.csv

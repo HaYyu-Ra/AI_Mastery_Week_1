@@ -1,115 +1,102 @@
-import os
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import talib as ta
-from textblob import TextBlob
 import streamlit as st
 
-# File paths
-RAW_DATA_PATH = os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "raw_analyst_ratings.csv")
-HISTORICAL_DATA_PATHS = {
-    "AAPL": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "AAPL_historical_data.csv"),
-    "AMZN": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "AMZN_historical_data.csv"),
-    "GOOG": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "GOOG_historical_data.csv"),
-    "META": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "META_historical_data.csv"),
-    "MSFT": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "MSFT_historical_data.csv"),
-    "NVDA": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "NVDA_historical_data.csv"),
-    "TSLA": os.path.join("C:\\Users\\hayyu.ragea\\AppData\\Local\\Programs\\Python\\Python312\\AI_Mastery_Week_1\\data\\", "TSLA_historical_data.csv"),
+# Define data paths
+data_paths = {
+    'AAPL': 'data/AAPL_historical_data.csv',
+    'AMZN': 'data/AMZN_historical_data.csv',
+    'GOOG': 'data/GOOG_historical_data.csv',
+    'META': 'data/META_historical_data.csv',
+    'MSFT': 'data/MSFT_historical_data.csv',
+    'NVDA': 'data/NVDA_historical_data.csv',
+    'TSLA': 'data/TSLA_historical_data.csv',
 }
 
-@st.cache_data
-def load_news_data():
-    return pd.read_csv(RAW_DATA_PATH)
+raw_data_path = 'data/raw_analyst_ratings.csv'
 
 @st.cache_data
-def load_stock_data(ticker):
-    return pd.read_csv(HISTORICAL_DATA_PATHS[ticker])
+def load_data():
+    raw_df = pd.read_csv(raw_data_path)
+    stock_data = {stock: pd.read_csv(path, parse_dates=['Date']) for stock, path in data_paths.items()}
+    return raw_df, stock_data
 
-# Sentiment Analysis Function
-def sentiment_analysis(headline):
-    analysis = TextBlob(headline)
-    return analysis.sentiment.polarity
-
-# Calculate Technical Indicators using TA-Lib
-def calculate_technical_indicators(df):
-    df['SMA_20'] = ta.SMA(df['Close'], timeperiod=20)
-    df['RSI'] = ta.RSI(df['Close'], timeperiod=14)
-    df['MACD'], df['MACD_signal'], df['MACD_hist'] = ta.MACD(df['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
-    return df
-
-# Visualize Data
-def visualize_stock_data(df, ticker):
+def plot_closing_prices(df, stock):
     fig, ax = plt.subplots(figsize=(14, 7))
-    ax.plot(df['Date'], df['Close'], label='Close Price')
-    ax.plot(df['Date'], df['SMA_20'], label='20-Day SMA')
-    ax.set_title(f"{ticker} Stock Price and Technical Indicators")
+    ax.plot(df['Date'], df['Close'], label='Close Price', color='blue')
+    ax.set_title(f'{stock} Closing Prices Over Time')
     ax.set_xlabel('Date')
-    ax.set_ylabel('Price')
+    ax.set_ylabel('Close Price')
     ax.legend()
-    ax.grid()
     return fig
 
-# Correlation Analysis
-def correlation_analysis(sentiments, stock_returns):
-    correlation = np.corrcoef(sentiments, stock_returns)[0, 1]
-    return correlation
+def plot_volume(df, stock):
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.plot(df['Date'], df['Volume'], label='Volume', color='orange')
+    ax.set_title(f'{stock} Volume Traded Over Time')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Volume')
+    ax.legend()
+    return fig
 
-# Streamlit Dashboard
-st.title("Financial News and Stock Market Dashboard")
+def plot_distribution(df, stock):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.histplot(df['Close'], kde=True, ax=ax)
+    ax.set_title(f'Distribution of {stock} Closing Prices')
+    ax.set_xlabel('Close Price')
+    ax.set_ylabel('Frequency')
+    return fig
 
-# Load and Display News Data
-news_data = load_news_data()
-st.subheader("News Data")
-st.dataframe(news_data.head())  # Display only the first few rows to avoid large data issues
+def plot_correlation(df, stock):
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(df.corr(), annot=True, cmap='coolwarm', linewidths=0.5, ax=ax)
+    ax.set_title(f'{stock} Correlation Matrix')
+    return fig
 
-# Perform Sentiment Analysis
-news_data['Sentiment'] = news_data['headline'].apply(sentiment_analysis)
-st.subheader("Sentiment Analysis")
-st.dataframe(news_data[['headline', 'Sentiment']].head())  # Display only the first few rows
+def display_kpis(df, stock):
+    kpis = {
+        'Average Close Price': df['Close'].mean(),
+        'Highest Close Price': df['Close'].max(),
+        'Lowest Close Price': df['Close'].min(),
+        'Total Volume Traded': df['Volume'].sum(),
+    }
+    st.write(f'**{stock} Key Performance Indicators (KPIs)**')
+    for key, value in kpis.items():
+        st.metric(label=key, value=f"${value:,.2f}")
 
-# Load and Analyze Stock Data
-selected_stock = st.selectbox("Select Stock Symbol", list(HISTORICAL_DATA_PATHS.keys()))
-stock_data = load_stock_data(selected_stock)
+def financial_dashboard():
+    st.title('Financial Dashboard: Analyst Ratings and Stock Analysis')
 
-# Ensure 'Date' columns are in datetime format
-news_data['Date'] = pd.to_datetime(news_data['date'], errors='coerce')
-stock_data['Date'] = pd.to_datetime(stock_data['Date'], errors='coerce')
+    raw_df, stock_data = load_data()
 
-# Double-check the data types
-st.write("News Data 'Date' column type:", news_data['Date'].dtype)
-st.write("Stock Data 'Date' column type:", stock_data['Date'].dtype)
+    st.header('Raw Analyst Ratings Data')
+    st.write(raw_df.head())
 
-# Calculate Technical Indicators
-stock_data = calculate_technical_indicators(stock_data)
+    for stock, df in stock_data.items():
+        st.subheader(f'{stock} Analysis')
+        
+        st.write(f'**Basic Statistics: {stock}**')
+        st.write(df.describe())
 
-# Visualize Stock Data
-st.subheader(f"{selected_stock} Stock Data and Technical Indicators")
-st.pyplot(visualize_stock_data(stock_data, selected_stock))
+        st.write(f'**{stock} Data Preview**')
+        st.write(df.head())
 
-# Correlation Analysis between Sentiment and Stock Movements
-st.subheader("Correlation Analysis")
+        st.write(f'**{stock} Closing Prices Over Time**')
+        st.pyplot(plot_closing_prices(df, stock))
 
-# Merge data and ensure correct data types
-merged_data = pd.merge(
-    news_data[['Date', 'Sentiment']].dropna(),
-    stock_data[['Date', 'Close']].dropna(),
-    on='Date',
-    how='inner'
-)
+        st.write(f'**{stock} Volume Traded Over Time**')
+        st.pyplot(plot_volume(df, stock))
 
-merged_data['Daily_Return'] = merged_data['Close'].pct_change()
-merged_data = merged_data.dropna()
+        st.write(f'**Distribution of {stock} Closing Prices**')
+        st.pyplot(plot_distribution(df, stock))
 
-correlation = correlation_analysis(merged_data['Sentiment'], merged_data['Daily_Return'])
-st.write(f"The correlation between news sentiment and daily stock returns for {selected_stock} is: {correlation:.4f}")
+        st.write(f'**{stock} Correlation Matrix**')
+        st.pyplot(plot_correlation(df, stock))
 
-# Investment Strategy Recommendation
-st.subheader("Investment Strategy Recommendation")
-if correlation > 0.1:
-    st.write("Positive correlation detected. Consider buying on positive sentiment.")
-elif correlation < -0.1:
-    st.write("Negative correlation detected. Consider selling on negative sentiment.")
-else:
-    st.write("No strong correlation detected. No clear investment strategy based on sentiment analysis.")
+        display_kpis(df, stock)
+
+    st.write("### End of Analysis")
+
+if __name__ == "__main__":
+    financial_dashboard()

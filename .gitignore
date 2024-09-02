@@ -10,3 +10,8 @@
 # You can also ignore specific large files by name if needed
 large_file.csv
 
+# Ignore all CSV files
+*.csv
+
+# Ignore a specific large file
+large_file.zip

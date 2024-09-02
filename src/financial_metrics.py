@@ -1,37 +1,59 @@
-import pynance as pn
+import os
 import pandas as pd
+import numpy as np
 
-# File paths for stock and market data
-stock_data_path = 'data/AAPL_historical_data.csv'
-market_data_path = 'data/market_historical_data.csv'
+# Set up paths
+processed_data_dir = "C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/processed_data"
 
-def load_data(file_path):
-    """Load historical data from a CSV file."""
-    return pd.read_csv(file_path)
+# List of stock symbols to analyze
+stock_symbols = ["AAPL", "AMZN", "GOOG", "META", "MSFT", "NVDA", "TSLA"]
 
-def validate_data(stock_data, market_data):
-    """Ensure data contains required columns."""
-    if 'Close' not in stock_data.columns or 'Close' not in market_data.columns:
-        raise ValueError("Both stock_data and market_data must contain a 'Close' column.")
+# Function to load prepared data
+def load_prepared_data(stock_symbol):
+    file_path = os.path.join(processed_data_dir, f"{stock_symbol}_prepared_data.csv")
+    df = pd.read_csv(file_path)
+    df['date'] = pd.to_datetime(df['date'])
+    return df
 
-def calculate_beta(stock_data, market_data):
-    """Calculate the beta of a stock relative to the market."""
-    validate_data(stock_data, market_data)
-    beta = pn.ta.beta(stock_data['Close'], market_data['Close'])
-    return beta
+# Function to calculate moving averages
+def calculate_moving_averages(df, window_sizes=[20, 50, 200]):
+    for window in window_sizes:
+        df[f"MA_{window}"] = df['Close'].rolling(window=window).mean()
+    return df
 
-def main():
-    """Main function to load data and calculate financial metrics."""
-    # Load stock and market data
-    stock_data = load_data(stock_data_path)
-    market_data = load_data(market_data_path)
-    
-    # Calculate and print beta
-    try:
-        beta = calculate_beta(stock_data, market_data)
-        print(f'Beta: {beta}')
-    except ValueError as e:
-        print(f'Error: {e}')
+# Function to calculate daily returns
+def calculate_daily_returns(df):
+    df['daily_return'] = df['Close'].pct_change()
+    return df
 
+# Function to calculate volatility
+def calculate_volatility(df, window=20):
+    df['volatility'] = df['daily_return'].rolling(window=window).std() * np.sqrt(window)
+    return df
+
+# Function to calculate cumulative returns
+def calculate_cumulative_returns(df):
+    df['cumulative_return'] = (1 + df['daily_return']).cumprod() - 1
+    return df
+
+# Function to calculate all financial metrics
+def calculate_financial_metrics(df):
+    df = calculate_moving_averages(df)
+    df = calculate_daily_returns(df)
+    df = calculate_volatility(df)
+    df = calculate_cumulative_returns(df)
+    return df
+
+# Run financial metrics calculation for each stock symbol
 if __name__ == "__main__":
-    main()
+    for stock_symbol in stock_symbols:
+        df = load_prepared_data(stock_symbol)
+        
+        # Calculate financial metrics
+        df = calculate_financial_metrics(df)
+        
+        # Save the resulting dataframe with financial metrics
+        output_file_path = os.path.join(processed_data_dir, f"{stock_symbol}_financial_metrics.csv")
+        df.to_csv(output_file_path, index=False)
+        
+        print(f"Financial metrics calculated and saved for {stock_symbol}")

@@ -1,42 +1,70 @@
 import pandas as pd
+import os
 
-# File path for the raw data
-data_path = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\raw_analyst_ratings.csv'
-cleaned_data_path = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\cleaned_analyst_ratings.csv'
+# Define paths for raw analyst ratings and historical data
+raw_analyst_ratings_path = r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\raw_analyst_ratings.csv"
+historical_data_paths = {
+    'AAPL': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AAPL_historical_data.csv",
+    'AMZN': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AMZN_historical_data.csv",
+    'GOOG': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\GOOG_historical_data.csv",
+    'META': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\META_historical_data.csv",
+    'MSFT': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\MSFT_historical_data.csv",
+    'NVDA': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\NVDA_historical_data.csv",
+    'TSLA': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\TSLA_historical_data.csv"
+}
+prepared_data_dir = r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\prepared_data"
+
+if not os.path.exists(prepared_data_dir):
+    os.makedirs(prepared_data_dir)
 
 def load_data(file_path):
-    """Load data from a CSV file."""
-    if pd.io.common.file_exists(file_path):
-        return pd.read_csv(file_path)
-    else:
-        raise FileNotFoundError(f'Data file not found at {file_path}')
+    """
+    Load data from the specified file path.
+    """
+    return pd.read_csv(file_path)
 
-def clean_data(df):
-    """Perform data cleaning tasks such as handling missing values."""
-    df = df.dropna()  # Drop rows with missing values
-    df = df.drop_duplicates()  # Remove duplicates
+def preprocess_stock_data(df):
+    """
+    Preprocess stock data for analysis.
+    """
+    # Ensure the Date column is in datetime format
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
+    # Sort data by Date
+    df = df.sort_values(by='Date')
+    
+    # Drop any rows with missing values in critical columns
+    df = df.dropna(subset=['Date', 'Close'])
+    
     return df
 
-def save_data(df, file_path):
-    """Save cleaned data to a CSV file."""
-    df.to_csv(file_path, index=False)
+def preprocess_analyst_ratings(df):
+    """
+    Preprocess raw analyst ratings data.
+    """
+    # Ensure the Date column is in datetime format
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
+    # Drop rows with missing values in critical columns
+    df = df.dropna(subset=['Date', 'Rating'])
+    
+    return df
 
 def main():
-    """Main function to load, clean, and save data."""
-    try:
-        raw_data = load_data(data_path)
-        print('Raw data loaded successfully.')
+    # Load and preprocess raw analyst ratings data
+    raw_analyst_ratings_df = load_data(raw_analyst_ratings_path)
+    raw_analyst_ratings_df = preprocess_analyst_ratings(raw_analyst_ratings_df)
+    raw_analyst_ratings_df.to_csv(os.path.join(prepared_data_dir, 'preprocessed_analyst_ratings.csv'), index=False)
+    
+    for stock, path in historical_data_paths.items():
+        # Load and preprocess historical stock data
+        stock_df = load_data(path)
+        stock_df = preprocess_stock_data(stock_df)
         
-        cleaned_data = clean_data(raw_data)
-        print('Data cleaned successfully.')
-        
-        save_data(cleaned_data, cleaned_data_path)
-        print(f'Cleaned data saved to {cleaned_data_path}')
-        
-    except FileNotFoundError as e:
-        print(e)
-    except Exception as e:
-        print(f'An error occurred: {e}')
+        # Save the preprocessed stock data
+        stock_df.to_csv(os.path.join(prepared_data_dir, f'preprocessed_{stock}_historical_data.csv'), index=False)
+    
+    print(f"Preprocessed data saved in {prepared_data_dir}")
 
 if __name__ == "__main__":
     main()

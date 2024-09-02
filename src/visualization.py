@@ -1,80 +1,68 @@
-import matplotlib.pyplot as plt
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import os
 
-# File paths
-stock_data_path = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AAPL_historical_data.csv'
+# Define paths for raw analyst ratings, historical data, and output visualizations
+raw_analyst_ratings_path = r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\raw_analyst_ratings.csv"
+historical_data_paths = {
+    'AAPL': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AAPL_historical_data.csv",
+    'AMZN': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AMZN_historical_data.csv",
+    'GOOG': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\GOOG_historical_data.csv",
+    'META': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\META_historical_data.csv",
+    'MSFT': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\MSFT_historical_data.csv",
+    'NVDA': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\NVDA_historical_data.csv",
+    'TSLA': r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\TSLA_historical_data.csv"
+}
+visualizations_output_dir = r"C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\visualizations"
 
-def load_stock_data(file_path):
-    """Load stock data from a CSV file."""
-    if os.path.exists(file_path):
-        return pd.read_csv(file_path, parse_dates=['Date'], index_col='Date')
-    else:
-        raise FileNotFoundError(f'Stock data file not found at {file_path}')
+if not os.path.exists(visualizations_output_dir):
+    os.makedirs(visualizations_output_dir)
 
-def plot_moving_averages(df, symbol):
-    """Plot the closing price and moving averages."""
+def load_data(file_path):
+    """
+    Load data from the specified file path.
+    """
+    return pd.read_csv(file_path)
+
+def plot_analyst_ratings_vs_price(df, stock):
+    """
+    Plot raw analyst ratings against the historical closing prices for the given stock.
+    """
     plt.figure(figsize=(14, 7))
-    plt.plot(df['Close'], label='Close Price')
-    if 'SMA' in df.columns:
-        plt.plot(df['SMA'], label='SMA', linestyle='--')
-    if 'EMA' in df.columns:
-        plt.plot(df['EMA'], label='EMA', linestyle='-.')
-    plt.title(f'{symbol} Stock Price and Moving Averages')
+    plt.plot(df['Date'], df['Close'], label='Close Price', color='black')
+    
+    # Plot raw analyst ratings if available
+    if 'Rating' in df.columns:
+        plt.plot(df['Date'], df['Rating'], label='Analyst Rating', color='orange', linestyle='--')
+    
+    plt.title(f'{stock} Analyst Ratings vs. Price')
     plt.xlabel('Date')
-    plt.ylabel('Price')
+    plt.ylabel('Value')
     plt.legend()
-    plt.grid(True)
-    plt.savefig(f'C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/plots/{symbol}_moving_averages.png')
-    plt.close()
-
-def plot_rsi(df, symbol):
-    """Plot the Relative Strength Index (RSI)."""
-    plt.figure(figsize=(14, 7))
-    if 'RSI' in df.columns:
-        plt.plot(df['RSI'], label='RSI', color='orange')
-        plt.axhline(70, linestyle='--', color='red', label='Overbought Threshold')
-        plt.axhline(30, linestyle='--', color='green', label='Oversold Threshold')
-    plt.title(f'{symbol} Relative Strength Index (RSI)')
-    plt.xlabel('Date')
-    plt.ylabel('RSI')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f'C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/plots/{symbol}_RSI.png')
-    plt.close()
-
-def plot_macd(df, symbol):
-    """Plot the Moving Average Convergence Divergence (MACD) and related indicators."""
-    plt.figure(figsize=(14, 7))
-    if 'MACD' in df.columns:
-        plt.plot(df['MACD'], label='MACD', color='blue')
-        if 'MACD_Signal' in df.columns:
-            plt.plot(df['MACD_Signal'], label='MACD Signal', color='red')
-        if 'MACD_Hist' in df.columns:
-            plt.bar(df.index, df['MACD_Hist'], label='MACD Histogram', color='gray', alpha=0.5)
-    plt.title(f'{symbol} MACD')
-    plt.xlabel('Date')
-    plt.ylabel('MACD')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f'C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/plots/{symbol}_MACD.png')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(visualizations_output_dir, f'{stock}_analyst_ratings_vs_price.png'))
     plt.close()
 
 def main():
-    try:
-        # Load stock data
-        stock_data = load_stock_data(stock_data_path)
+    # Load raw analyst ratings data
+    raw_analyst_ratings_df = load_data(raw_analyst_ratings_path)
+    
+    for stock, path in historical_data_paths.items():
+        # Load historical data for each stock
+        stock_df = load_data(path)
         
-        # Plot visualizations
-        symbol = 'AAPL'  # Example symbol
-        plot_moving_averages(stock_data, symbol)
-        plot_rsi(stock_data, symbol)
-        plot_macd(stock_data, symbol)
+        # Merge historical data with raw analyst ratings based on the Date column
+        if 'Date' in raw_analyst_ratings_df.columns:
+            merged_df = pd.merge(stock_df, raw_analyst_ratings_df, on='Date', how='left')
+        else:
+            merged_df = stock_df
         
-        print(f'Visualizations for {symbol} completed.')
-        
-    except FileNotFoundError as e:
-        print(e)
+        # Plot analyst ratings vs. price
+        plot_analyst_ratings_vs_price(merged_df, stock)
+    
+    print(f"Visualizations saved in {visualizations_output_dir}")
 
 if __name__ == "__main__":
     main()

@@ -1,77 +1,58 @@
+import unittest
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
+from your_analysis_module import load_data, clean_data, perform_eda, calculate_technical_indicators
 
-# File paths
-test_data_path = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\test_data.csv'
-test_output_path = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\outputs\test_analysis_results.csv'
-heatmap_output_path = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\plots\test_correlation_heatmap.png'
+class TestAnalysis(unittest.TestCase):
 
-def load_test_data(file_path):
-    """Load test data from a CSV file."""
-    if os.path.exists(file_path):
-        return pd.read_csv(file_path)
-    else:
-        raise FileNotFoundError(f'Test data file not found at {file_path}')
+    def setUp(self):
+        # Setup paths for test data
+        self.data_dir = "C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/data"
+        self.news_file_path = f"{self.data_dir}/raw_analyst_ratings.csv"
+        self.historical_files = {
+            "AAPL": f"{self.data_dir}/AAPL_historical_data.csv",
+            "AMZN": f"{self.data_dir}/AMZN_historical_data.csv",
+            "GOOG": f"{self.data_dir}/GOOG_historical_data.csv",
+            "META": f"{self.data_dir}/META_historical_data.csv",
+            "MSFT": f"{self.data_dir}/MSFT_historical_data.csv",
+            "NVDA": f"{self.data_dir}/NVDA_historical_data.csv",
+            "TSLA": f"{self.data_dir}/TSLA_historical_data.csv"
+        }
 
-def perform_eda(df):
-    """Perform Exploratory Data Analysis (EDA) on the test data."""
-    # Describe the data
-    description = df.describe()
-    
-    # Check for missing values
-    missing_values = df.isnull().sum()
-    
-    # Display summary statistics
-    print('Summary Statistics:')
-    print(description)
-    
-    print('Missing Values:')
-    print(missing_values)
-    
-    return description, missing_values
-
-def calculate_correlations(df):
-    """Calculate correlations between numerical features in the test data."""
-    correlation_matrix = df.corr()
-    return correlation_matrix
-
-def plot_heatmap(correlation_matrix, output_path):
-    """Plot and save a heatmap of the correlation matrix."""
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
-    plt.title('Correlation Heatmap')
-    plt.savefig(output_path)
-    plt.close()
-
-def main():
-    """Main function to perform test analysis."""
-    try:
         # Load test data
-        df = load_test_data(test_data_path)
-        print('Test data loaded successfully.')
-        
-        # Perform EDA
-        description, missing_values = perform_eda(df)
-        
-        # Calculate correlations
-        correlation_matrix = calculate_correlations(df)
-        print('Correlation analysis complete.')
-        
-        # Save correlation results
-        correlation_matrix.to_csv(test_output_path)
-        print(f'Correlation analysis results saved to {test_output_path}')
-        
-        # Plot and save heatmap
-        plot_heatmap(correlation_matrix, heatmap_output_path)
-        print(f'Heatmap saved to {heatmap_output_path}')
-        
-    except FileNotFoundError as e:
-        print(e)
-    except Exception as e:
-        print(f'An error occurred: {e}')
+        self.news_df = pd.read_csv(self.news_file_path)
+        self.stock_dfs = {ticker: pd.read_csv(file) for ticker, file in self.historical_files.items()}
 
-if __name__ == "__main__":
-    main()
+    def test_load_data(self):
+        # Check if data is loaded correctly
+        self.assertFalse(self.news_df.empty, "News DataFrame should not be empty")
+        for ticker, df in self.stock_dfs.items():
+            self.assertFalse(df.empty, f"Stock DataFrame for {ticker} should not be empty")
+
+    def test_clean_data(self):
+        # Clean the data and check if no NaNs are present in critical columns
+        clean_news_df = clean_data(self.news_df)
+        clean_stock_dfs = {ticker: clean_data(df, is_stock=True) for ticker, df in self.stock_dfs.items()}
+        self.assertTrue(clean_news_df['headline'].notna().all(), "News headlines should not contain NaNs after cleaning")
+        for ticker, df in clean_stock_dfs.items():
+            self.assertTrue(df['Close'].notna().all(), f"Stock prices for {ticker} should not contain NaNs after cleaning")
+
+    def test_descriptive_statistics(self):
+        # Test if descriptive statistics are computed
+        desc_stats = perform_eda(self.news_df, self.stock_dfs['AAPL'])
+        self.assertIn('headline_length', desc_stats, "Descriptive statistics should include headline length")
+        self.assertIn('Close', desc_stats, "Descriptive statistics should include stock prices")
+
+    def test_technical_indicators(self):
+        # Test if technical indicators are computed correctly
+        indicators_dfs = {ticker: calculate_technical_indicators(df) for ticker, df in self.stock_dfs.items()}
+        for ticker, indicators_df in indicators_dfs.items():
+            self.assertIn('SMA', indicators_df.columns, f"Technical indicators for {ticker} should include SMA")
+            self.assertIn('RSI', indicators_df.columns, f"Technical indicators for {ticker} should include RSI")
+
+    def tearDown(self):
+        # Clean up any resources if necessary
+        pass
+
+if __name__ == '__main__':
+    unittest.main()

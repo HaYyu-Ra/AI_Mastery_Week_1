@@ -1,99 +1,84 @@
-import pandas as pd
-import numpy as np
-from textblob import TextBlob
-import streamlit as st
 import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# File paths
-NEWS_FILE_PATH = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\raw_analyst_ratings.csv'
-STOCK_DATA_PATHS = {
-    'AAPL': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AAPL_historical_data.csv',
-    'AMZN': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AMZN_historical_data.csv',
-    'GOOG': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\GOOG_historical_data.csv',
-    'META': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\META_historical_data.csv',
-    'MSFT': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\MSFT_historical_data.csv',
-    'NVDA': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\NVDA_historical_data.csv',
-    'TSLA': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\TSLA_historical_data.csv'
-}
+# Set up paths
+processed_data_dir = "C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/processed_data"
 
-def perform_sentiment_analysis(text):
-    """Perform sentiment analysis using TextBlob and return the sentiment score."""
-    return TextBlob(text).sentiment.polarity
+# List of stock symbols to analyze
+stock_symbols = ["AAPL", "AMZN", "GOOG", "META", "MSFT", "NVDA", "TSLA"]
 
-def calculate_daily_returns(stock_data):
-    """Calculate daily returns for stock data."""
-    stock_data['Date'] = pd.to_datetime(stock_data['Date'], errors='coerce')
-    stock_data.set_index('Date', inplace=True)
-    stock_data['Daily Return'] = stock_data['Close'].pct_change() * 100
-    return stock_data.dropna(subset=['Daily Return'])
+# Function to load prepared data
+def load_prepared_data(stock_symbol):
+    file_path = os.path.join(processed_data_dir, f"{stock_symbol}_prepared_data.csv")
+    df = pd.read_csv(file_path)
+    return df
 
-def parse_dates(date_series):
-    """Parse dates with multiple formats."""
-    formats = [
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d",
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y"
-    ]
-    for fmt in formats:
-        try:
-            return pd.to_datetime(date_series, format=fmt, errors='coerce')
-        except ValueError:
-            continue
-    return pd.to_datetime(date_series, errors='coerce')
+# Function to plot sentiment score distribution
+def plot_sentiment_distribution(df, stock_symbol):
+    plt.figure(figsize=(10, 6))
+    sns.histplot(df['sentiment_score'], bins=20, kde=True, color='blue')
+    plt.title(f"Sentiment Score Distribution for {stock_symbol}")
+    plt.xlabel("Sentiment Score")
+    plt.ylabel("Frequency")
+    plt.grid(True)
+    plt.show()
 
-def plot_linear_regression(x, y, title):
-    """Plot linear regression with a scatter plot and fit line."""
-    if len(x) > 1 and len(y) > 1:
-        m, b = np.polyfit(x, y, 1)
-        fit_line = m * x + b
-        st.line_chart(pd.DataFrame({
-            'Sentiment Score': y,
-            'Daily Return': x,
-            'Fit Line': fit_line
-        }).set_index(x.name))
-        st.write(f'Linear regression coefficients: m={m:.4f}, b={b:.4f}')
-    else:
-        st.warning(f'Not enough data points for visualization.')
+# Function to plot stock price trends
+def plot_stock_price_trend(df, stock_symbol):
+    plt.figure(figsize=(14, 8))
+    plt.plot(df['date'], df['Close'], label='Close Price', color='orange')
+    plt.title(f"Stock Price Trend for {stock_symbol}")
+    plt.xlabel("Date")
+    plt.ylabel("Close Price (USD)")
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    plt.show()
 
-def main():
-    st.title("Financial News Sentiment Analysis Dashboard")
+# Function to plot sentiment vs. stock price
+def plot_sentiment_vs_stock_price(df, stock_symbol):
+    fig, ax1 = plt.subplots(figsize=(14, 8))
+    
+    ax1.set_xlabel("Date")
+    ax1.set_ylabel("Close Price (USD)", color='orange')
+    ax1.plot(df['date'], df['Close'], color='orange', label='Close Price')
+    ax1.tick_params(axis='y', labelcolor='orange')
+    
+    ax2 = ax1.twinx()
+    ax2.set_ylabel("Sentiment Score", color='blue')
+    ax2.plot(df['date'], df['sentiment_score'], color='blue', label='Sentiment Score')
+    ax2.tick_params(axis='y', labelcolor='blue')
+    
+    plt.title(f"Sentiment Score vs. Stock Price for {stock_symbol}")
+    fig.tight_layout()
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    plt.show()
 
-    # Load and preprocess news data
-    if os.path.exists(NEWS_FILE_PATH):
-        news_df = pd.read_csv(NEWS_FILE_PATH).drop(columns=['Unnamed: 0'], errors='ignore')
-        st.write("Sample date values before parsing:")
-        st.write(news_df['date'].head(20))
-        
-        news_df['date'] = parse_dates(news_df['date'])
-        
-        if news_df['date'].isnull().any():
-            error_dates = news_df[news_df['date'].isnull()]['date']
-            st.error("Some dates could not be parsed. Check the date format.")
-            st.write("Problematic date values:")
-            st.write(error_dates)
+# Function to calculate and plot correlation between sentiment and stock price
+def plot_correlation(df, stock_symbol):
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(df[['sentiment_score', 'Close']].corr(), annot=True, cmap='coolwarm', vmin=-1, vmax=1)
+    plt.title(f"Correlation between Sentiment Score and Close Price for {stock_symbol}")
+    plt.show()
 
-        news_df['sentiment_score'] = news_df['headline'].apply(perform_sentiment_analysis)
-        st.write('Sentiment analysis complete.')
-
-        # Prepare a DataFrame to hold correlation results
-        correlation_results = []
-
-        for symbol, stock_file_path in STOCK_DATA_PATHS.items():
-            if os.path.exists(stock_file_path):
-                stock_df = pd.read_csv(stock_file_path)
-                stock_df = calculate_daily_returns(stock_df)
-                
-                # Ensure 'Date' column in stock_df is timezone-naive
-                stock_df.index = stock_df.index.tz_localize(None)
-                
-                # Merge stock data with news data based on 'Date'
-                merged_df = pd.merge(news_df, stock_df, left_on='date', right_index=True, how='inner')
-                
-                # Plot linear regression
-                plot_linear_regression(merged_df['sentiment_score'], merged_df['Daily Return'], f'{symbol} - Sentiment vs Return')
-
-        st.write("EDA and sentiment analysis complete.")
-
+# Run EDA for each stock symbol
 if __name__ == "__main__":
-    main()
+    for stock_symbol in stock_symbols:
+        df = load_prepared_data(stock_symbol)
+        
+        # Convert date column to datetime for plotting
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # Plot sentiment score distribution
+        plot_sentiment_distribution(df, stock_symbol)
+        
+        # Plot stock price trend
+        plot_stock_price_trend(df, stock_symbol)
+        
+        # Plot sentiment score vs. stock price
+        plot_sentiment_vs_stock_price(df, stock_symbol)
+        
+        # Plot correlation between sentiment score and stock price
+        plot_correlation(df, stock_symbol)

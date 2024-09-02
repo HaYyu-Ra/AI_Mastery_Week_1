@@ -1,84 +1,72 @@
 import pandas as pd
-import streamlit as st
-import matplotlib.pyplot as plt
-import seaborn as sns
 import os
-from textblob import TextBlob
 
-# File paths
-OUTPUT_CSV_PATH = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\outputs\correlation_analysis.csv'
-NEWS_FILE_PATH = r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\raw_analyst_ratings.csv'
-STOCK_DATA_PATHS = {
-    'AAPL': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AAPL_historical_data.csv',
-    'AMZN': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\AMZN_historical_data.csv',
-    'GOOG': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\GOOG_historical_data.csv',
-    'META': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\META_historical_data.csv',
-    'MSFT': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\MSFT_historical_data.csv',
-    'NVDA': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\NVDA_historical_data.csv',
-    'TSLA': r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\data\TSLA_historical_data.csv'
+# Set up file paths
+data_dir = "C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/data"
+output_path = "C:/Users/hayyu.ragea/AppData/Local/Programs/Python/Python312/AI_Mastery_Week_1/correlation_analysis"
+
+# File paths for the data
+news_file_path = os.path.join(data_dir, "raw_analyst_ratings.csv")
+historical_files = {
+    "AAPL": os.path.join(data_dir, "AAPL_historical_data.csv"),
+    "AMZN": os.path.join(data_dir, "AMZN_historical_data.csv"),
+    "GOOG": os.path.join(data_dir, "GOOG_historical_data.csv"),
+    "META": os.path.join(data_dir, "META_historical_data.csv"),
+    "MSFT": os.path.join(data_dir, "MSFT_historical_data.csv"),
+    "NVDA": os.path.join(data_dir, "NVDA_historical_data.csv"),
+    "TSLA": os.path.join(data_dir, "TSLA_historical_data.csv")
 }
 
-def load_data():
-    """Load news and stock data."""
-    try:
-        # Load news data
-        news_data = pd.read_csv(NEWS_FILE_PATH)
-        # Load stock data
-        stock_data = {symbol: pd.read_csv(path, parse_dates=['Date'], index_col='Date') for symbol, path in STOCK_DATA_PATHS.items()}
-        return news_data, stock_data
-    except FileNotFoundError as e:
-        st.error(f'File not found: {e}')
-        raise
+def load_and_prepare_data(news_file_path, historical_files):
+    """Load news and stock data, merge on date, and prepare for correlation analysis."""
+    # Load news data
+    news_df = pd.read_csv(news_file_path)
+    news_df.dropna(subset=['headline', 'date'], inplace=True)
+    news_df['date'] = pd.to_datetime(news_df['date']).dt.date
 
-def calculate_sentiment(text):
-    """Calculate sentiment of a text using TextBlob."""
-    analysis = TextBlob(text)
-    return analysis.sentiment.polarity
+    # Load stock data
+    stock_dfs = {ticker: pd.read_csv(file) for ticker, file in historical_files.items()}
+    for ticker, stock_df in stock_dfs.items():
+        stock_df.dropna(subset=['Date'], inplace=True)
+        stock_df['Date'] = pd.to_datetime(stock_df['Date']).dt.date
+        stock_df['Daily_Return'] = stock_df['Close'].pct_change()
+    
+    return news_df, stock_dfs
 
-def analyze_sentiment(news_data):
-    """Analyze sentiment for news data and merge with stock data."""
-    news_data['Sentiment'] = news_data['Title'].apply(calculate_sentiment)
-    return news_data
+def analyze_correlation(news_df, stock_dfs):
+    """Analyze the correlation between news sentiment and stock daily returns."""
+    correlations = {}
+    
+    # Assuming news_df has a 'sentiment' column and stock_dfs has 'Daily_Return'
+    for ticker, stock_df in stock_dfs.items():
+        # Merge news and stock data
+        merged_df = pd.merge(news_df, stock_df, left_on='date', right_on='Date', how='inner')
 
-def calculate_correlations(news_data, stock_data):
-    """Calculate correlations between news sentiment and stock data."""
-    results = []
-    for symbol, df in stock_data.items():
-        if 'Sentiment' in news_data.columns:
-            df['Sentiment'] = news_data['Sentiment'].reindex(df.index, method='ffill')
-            df['Return'] = df['Close'].pct_change()
-            correlation = df[['Sentiment', 'Return']].dropna().corr().iloc[0, 1]
-            results.append({'Symbol': symbol, 'Correlation': correlation})
-    return pd.DataFrame(results)
+        # Check if there's sentiment data
+        if 'sentiment' in merged_df.columns:
+            # Calculate the correlation
+            correlation = merged_df['sentiment'].corr(merged_df['Daily_Return'])
+            correlations[ticker] = correlation
 
-def plot_correlation_heatmap(correlation_df):
-    """Plot heatmap of the correlation between news sentiment and stock returns."""
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(correlation_df.set_index('Symbol').T, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
-    plt.title('Correlation between News Sentiment and Stock Returns')
-    plt.savefig(r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\plots\sentiment_stock_correlation_heatmap.png')
-    plt.close()
+    return correlations
+
+def save_correlation_results(correlations, output_path):
+    """Save the correlation results to a CSV file."""
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    
+    # Convert the correlations dictionary to a DataFrame
+    correlation_df = pd.DataFrame(list(correlations.items()), columns=['Ticker', 'Correlation'])
+    
+    # Save to CSV
+    output_file_path = os.path.join(output_path, "correlation_results.csv")
+    correlation_df.to_csv(output_file_path, index=False)
+    print(f"Correlation analysis results saved to {output_file_path}")
 
 def main():
-    """Main function to run the analysis."""
-    try:
-        # Load data
-        news_data, stock_data = load_data()
-        
-        # Analyze sentiment
-        news_data = analyze_sentiment(news_data)
-        
-        # Calculate correlations
-        correlation_df = calculate_correlations(news_data, stock_data)
-        correlation_df.to_csv(OUTPUT_CSV_PATH, index=False)
-        st.write(f'Correlation analysis results saved to {OUTPUT_CSV_PATH}')
-        
-        # Plot heatmap
-        plot_correlation_heatmap(correlation_df)
-        st.image(r'C:\Users\hayyu.ragea\AppData\Local\Programs\Python\Python312\AI_Mastery_Week_1\plots\sentiment_stock_correlation_heatmap.png', caption='Sentiment vs. Stock Returns Correlation Heatmap')
-
-    except Exception as e:
-        st.error(f'An error occurred: {e}')
+    news_df, stock_dfs = load_and_prepare_data(news_file_path, historical_files)
+    correlations = analyze_correlation(news_df, stock_dfs)
+    save_correlation_results(correlations, output_path)
 
 if __name__ == "__main__":
     main()
